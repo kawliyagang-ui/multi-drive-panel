@@ -1,0 +1,17 @@
+# Render FREE test deploy. Free plan: no persistent disk (index DB
+# resets on restart/redeploy) and the service sleeps when idle.
+# For real use switch plan to starter and add a disk (see DEPLOY-SERVER.md).
+services:
+  - type: web
+    name: multi-drive-panel
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DATA_DIR
+        value: /app/data
+      - key: BASE_URL
+        sync: false        # after deploy, set to the real https URL Render gives
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false

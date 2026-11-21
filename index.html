@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-Drive Storage Pool — Panel</title>
+<style>
+  * { box-sizing: border-box; margin: 0; font-family: system-ui, 'Hind Siliguri', sans-serif; }
+  body { background: #0d0d10; color: #eee; padding: 16px; max-width: 960px; margin: auto; }
+  h1 { font-size: 22px; } h1 span { color: #e8435f; }
+  h2 { font-size: 17px; margin: 22px 0 10px; color: #ffb3c0; }
+  .sub { color: #999; font-size: 13px; margin-top: 4px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+  .card { background: #17171c; border: 1px solid #26262e; border-radius: 12px; padding: 14px; }
+  .card b { font-size: 20px; display: block; }
+  .card small { color: #999; }
+  .msg { background: #12351c; border: 1px solid #1f6b35; padding: 10px 14px; border-radius: 10px; margin-top: 12px; }
+  .err { background: #3d1420; border: 1px solid #8c2438; padding: 10px 14px; border-radius: 10px; margin-top: 12px; }
+  .warn { background: #38300f; border: 1px solid #8a7414; padding: 10px 14px; border-radius: 10px; margin-top: 12px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; background: #17171c; border-radius: 12px; overflow: hidden; }
+  td, th { padding: 9px 10px; border-bottom: 1px solid #26262e; font-size: 14px; text-align: left; }
+  th { color: #999; font-weight: 600; }
+  .bar { background: #26262e; height: 8px; border-radius: 4px; overflow: hidden; min-width: 90px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, #e8435f, #b04dff); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #26262e; color: #ccc; }
+  .badge.google { background: #14331f; color: #7ddb97; }
+  .badge.local { background: #33291a; color: #e8c37a; }
+  button, .btn { background: linear-gradient(90deg, #e8435f, #b04dff); color: #fff; border: 0; padding: 9px 16px; border-radius: 9px; cursor: pointer; font-size: 14px; text-decoration: none; display: inline-block; }
+  button.small, .btn.small { padding: 5px 10px; font-size: 12px; }
+  button.ghost { background: #26262e; }
+  form.inline { display: inline; }
+  input[type=file], select { background: #17171c; color: #eee; border: 1px solid #33333c; border-radius: 9px; padding: 9px; }
+  .panel { background: #17171c; border: 1px solid #26262e; border-radius: 12px; padding: 16px; margin-top: 10px; }
+  video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
+  .empty { color: #777; font-size: 14px; padding: 8px 0; }
+</style>
+</head>
+<body>
+  <h1>Multi-Drive <span>Storage Pool</span></h1>
+  <div class="sub">Minimum {{ min_accounts }} ta Gmail account, maximum kono limit nai · Boro file 100/200 MB tukra hoye alada alada account-e thake</div>
+
+  {% if msg %}<div class="msg">✅ {{ msg }}</div>{% endif %}
+  {% if err %}<div class="err">⚠️ {{ err }}</div>{% endif %}
+  {% if not google_ready %}
+  <div class="warn">🔧 <b>Google OAuth ekhono setup hoyni.</b> Asol Gmail connect korte <b>.env</b> file-e GOOGLE_CLIENT_ID ar GOOGLE_CLIENT_SECRET boshao (SETUP-GUIDE dekhho). Totodin <b>Test Mode</b> diye puropuri try korte parba.</div>
+  {% endif %}
+  {% if n_active < min_accounts %}
+  <div class="warn">⏳ Upload chalu hote minimum <b>{{ min_accounts }} ta</b> account lagbe — ekhon active ache <b>{{ n_active }} ta</b>.</div>
+  {% endif %}
+
+  <div class="cards">
+    <div class="card"><b>{{ fmt(total) }}</b><small>Mot Pool Storage</small></div>
+    <div class="card"><b>{{ fmt(used) }}</b><small>Use Hoiyeche</small></div>
+    <div class="card"><b>{{ fmt(free) }}</b><small>Khali Ache</small></div>
+    <div class="card"><b>{{ accounts|length }}</b><small>Account</small></div>
+    <div class="card"><b>{{ files|length }}</b><small>File</small></div>
+  </div>
+
+  <h2>🔗 Account Pool</h2>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <a class="btn" href="/auth/connect">+ Gmail Connect Koro</a>
+    <form class="inline" method="post" action="/demo/setup"><button class="ghost" type="submit">Test Mode: 5 ta Demo Account</button></form>
+  </div>
+  {% if accounts %}
+  <table style="margin-top:10px;">
+    <tr><th>Account</th><th>Type</th><th>Storage</th><th></th><th>Status</th><th></th></tr>
+    {% for a in accounts %}
+    <tr>
+      <td>{{ a.email }}</td>
+      <td><span class="badge {{ a.provider }}">{{ 'Gmail' if a.provider=='google' else 'TEST' }}</span></td>
+      <td>{{ fmt(a.used_bytes) }} / {{ fmt(a.total_bytes) }}</td>
+      <td><div class="bar"><i style="width: {{ (a.used_bytes * 100 // a.total_bytes) if a.total_bytes else 0 }}%"></i></div></td>
+      <td>{{ a.status }}</td>
+      <td style="white-space:nowrap;">
+        <form class="inline" method="post" action="/accounts/refresh/{{ a.id }}"><button class="small ghost" type="submit">Refresh</button></form>
+        <form class="inline" method="post" action="/accounts/delete/{{ a.id }}" onsubmit="return confirm('Account bad debe?')"><button class="small ghost" type="submit">Bad</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="empty">Ekhono kono account connect nai.</div>{% endif %}
+
+  <h2>⬆️ File Upload</h2>
+  <div class="panel">
+    <form method="post" action="/upload" enctype="multipart/form-data" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <input type="file" name="file" required>
+      <button type="submit">Upload</button>
+    </form>
+    <form method="post" action="/settings" style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+      <label style="font-size:14px; color:#999;">Chunk size:</label>
+      <select name="chunk_size_mb">
+        <option value="100" {% if chunk_size_mb==100 %}selected{% endif %}>100 MB</option>
+        <option value="200" {% if chunk_size_mb==200 %}selected{% endif %}>200 MB</option>
+      </select>
+      <button class="small" type="submit">Save</button>
+      <span style="font-size:12px; color:#777;">Er beshi boro file ei size-e tukra hoye alada account-e jabe</span>
+    </form>
+  </div>
+
+  <h2>🎬 File List</h2>
+  <div id="playerWrap" style="display:none;">
+    <video id="player" controls playsinline></video>
+  </div>
+  {% if files %}
+  <table style="margin-top:10px;">
+    <tr><th>File</th><th>Size</th><th>Tukra</th><th></th></tr>
+    {% for f in files %}
+    <tr>
+      <td>{{ f.name }}</td>
+      <td>{{ fmt(f.size) }}</td>
+      <td>{{ f.n_chunks }} ta</td>
+      <td style="white-space:nowrap;">
+        {% if f.mime_type and f.mime_type.startswith('video') %}
+        <button class="small" onclick="play({{ f.id }})">▶ Play</button>
+        {% endif %}
+        <a class="btn small" href="/files/{{ f.id }}/download">Download</a>
+        <form class="inline" method="post" action="/files/{{ f.id }}/delete" onsubmit="return confirm('File delete korba?')"><button class="small ghost" type="submit">Delete</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="empty">Ekhono kono file upload hoyni.</div>{% endif %}
+
+<script>
+function play(id) {
+  var w = document.getElementById('playerWrap');
+  var v = document.getElementById('player');
+  w.style.display = 'block';
+  v.src = '/files/' + id + '/stream';
+  v.play();
+  w.scrollIntoView({behavior: 'smooth'});
+}
+</script>
+</body>
+</html>
